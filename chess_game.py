@@ -1,114 +1,4 @@
-# ... (Keep all code before update_display the same) ...
-
-def update_display(self):
-        """Updates the board display, last move, selection, and captured pieces."""
-        piece_symbols = {'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
-                         'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'}
-        piece_colors = {'white': '#FFFFFF', 'black': '#000000'}
-
-        # Ensure widgets and board exist before updating
-        if not self.squares or not self.squares[0][0] or not self.board:
-             # print("Warning: Attempted update_display before full initialization.") # Optional debug
-             return
-
-        # 1. Reset backgrounds
-        for r in range(8):
-            for c in range(8):
-                if self.squares[r][c]:
-                    original_bg = self.light_color if (r + c) % 2 == 0 else self.dark_color
-                    try: self.squares[r][c].config(bg=original_bg)
-                    except tk.TclError: pass
-
-        # 2. Highlight last move
-        if self.last_move:
-            from_r, from_c, to_r, to_c, _ = self.last_move
-            # Check if squares exist before accessing them
-            if 0 <= from_r < 8 and 0 <= from_c < 8 and self.squares[from_r][from_c]:
-                try: self.squares[from_r][from_c].config(bg=self.last_move_from_color)
-                except tk.TclError: pass
-            if 0 <= to_r < 8 and 0 <= to_c < 8 and self.squares[to_r][to_c]:
-                 try: self.squares[to_r][to_c].config(bg=self.last_move_to_color)
-                 except tk.TclError: pass
-
-        # 3. Highlight selection
-        if self.selected_piece:
-            sel_r, sel_c = self.selected_piece
-            if 0 <= sel_r < 8 and 0 <= sel_c < 8 and self.squares[sel_r][sel_c]:
-                try: self.squares[sel_r][sel_c].config(bg=self.highlight_color)
-                except tk.TclError: pass
-
-        # 4. Set piece symbols
-        for row in range(8):
-            for col in range(8):
-                square_button = self.squares[row][col]
-                if not square_button: continue
-                piece = self.board[row][col] # Read from self.board
-                text_symbol = ''
-                text_color = 'black'
-                if piece:
-                    color, piece_type = piece
-                    symbol_key = piece_type.upper() if color == 'white' else piece_type.lower()
-                    text_symbol = piece_symbols.get(symbol_key, '?')
-                    text_color = piece_colors.get(color, 'black')
-                try:
-                    square_button.config(font=self.piece_font, text=text_symbol, fg=text_color)
-                except tk.TclError: pass
-
-        # 5. Update Captured Pieces
-        white_captures_text = ""
-        value_diff_white = 0
-        black_captures_text = ""
-        value_diff_black = 0
-
-        # Ensure captured_pieces is initialized
-        if self.captured_pieces:
-            # White captures (black pieces)
-            for cap_color, cap_type in self.captured_pieces.get('white', []):
-                symbol_key = cap_type.lower()
-                white_captures_text += piece_symbols.get(symbol_key, '?') + " "
-                value_diff_white += self.piece_values.get(cap_type, 0)
-
-            # Black captures (white pieces)
-            for cap_color, cap_type in self.captured_pieces.get('black', []):
-                symbol_key = cap_type.upper()
-                black_captures_text += piece_symbols.get(symbol_key, '?') + " "
-                value_diff_black += self.piece_values.get(cap_type, 0)
-
-            # Calculate and add material difference
-            diff = value_diff_white - value_diff_black
-            if diff > 0: white_captures_text += f"\n+{diff}"
-            elif diff < 0: black_captures_text += f"\n+{-diff}"
-
-            # Update labels (with try-except for safety)
-            if self.white_captured_label:
-                 try:
-                     self.white_captured_label.config(text=white_captures_text.strip())
-                 except tk.TclError:
-                     pass
-            if self.black_captured_label:
-                 try:
-                     self.black_captured_label.config(text=black_captures_text.strip())
-                 except tk.TclError:
-                     pass
-        else:
-             # Clear capture labels if captured_pieces is None (e.g., during initial setup)
-             # --- CORRECTED SYNTAX ---
-             if self.white_captured_label:
-                 try:
-                     self.white_captured_label.config(text="")
-                 except tk.TclError:
-                     pass # Ignore if widget destroyed during reset/close
-             if self.black_captured_label:
-                 try:
-                     self.black_captured_label.config(text="")
-                 except tk.TclError:
-                     pass # Ignore if widget destroyed during reset/close
-             # --- END CORRECTION ---
-
-# ... (Keep all code after update_display the same) ...
-
-# Full corrected class (only update_display changed significantly from last version)
-
+# -*- coding: utf-8 -*- # Ensure UTF-8 encoding for symbols
 import tkinter as tk
 from tkinter import messagebox
 import tkinter.font as tkFont
@@ -120,12 +10,13 @@ class ChessGame:
     def __init__(self):
         self.window = tk.Tk()
         self.window.title("Resizable Elegant Chess Game")
-        self.window.minsize(360, 300)
+        self.window.minsize(400, 320) # Keep slightly larger minimum size
 
         # --- Visual Enhancements ---
         self.initial_font_size = 16
         self.piece_font = tkFont.Font(family="Arial Unicode MS", size=self.initial_font_size, weight="bold")
         self.capture_font = tkFont.Font(family="Arial Unicode MS", size=max(8, self.initial_font_size - 4), weight="normal")
+        self.diff_font = tkFont.Font(family="Arial", size=max(8, self.initial_font_size - 5), weight="bold") # Font for difference
 
         self.light_color = '#E8E8E8'
         self.dark_color = '#7C9A7C'
@@ -147,7 +38,7 @@ class ChessGame:
         self.last_move = None
         self.castling_rights = None
         self.captured_pieces = None
-        self.squares = [] # Initialize squares list
+        self.squares = []
 
         # --- Window and Frame Setup ---
         self.window.grid_rowconfigure(0, weight=1)
@@ -156,24 +47,53 @@ class ChessGame:
         self.main_frame = tk.Frame(self.window, padx=5, pady=5)
         self.main_frame.grid(row=0, column=0, sticky="nsew")
         self.main_frame.grid_rowconfigure(0, weight=1)
-        self.main_frame.grid_columnconfigure(0, weight=0, minsize=40)
-        self.main_frame.grid_columnconfigure(1, weight=1)
-        self.main_frame.grid_columnconfigure(2, weight=0, minsize=40)
+        self.main_frame.grid_columnconfigure(0, weight=0, minsize=50) # Left captures
+        self.main_frame.grid_columnconfigure(1, weight=1)            # Board
+        self.main_frame.grid_columnconfigure(2, weight=0, minsize=50) # Right captures
 
-        # --- Capture Display Areas ---
+        # --- Capture Display Areas (Layout for two columns + diff is correct) ---
+        # Left Frame (White Captures)
         self.left_capture_frame = tk.Frame(self.main_frame, bg=self.capture_bg_color, padx=3, pady=3)
-        self.left_capture_frame.grid(row=0, column=0, sticky="ns", padx=(0, 3))
-        self.white_captured_label = tk.Label(self.left_capture_frame, text="", font=self.capture_font,
-                                             justify=tk.LEFT, anchor='nw', wraplength=35,
-                                             bg=self.capture_bg_color)
-        self.white_captured_label.pack(fill=tk.BOTH, expand=True)
+        self.left_capture_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 3))
+        self.left_capture_frame.grid_rowconfigure(0, weight=1) # Row for piece labels
+        self.left_capture_frame.grid_rowconfigure(1, weight=0) # Row for diff label
+        self.left_capture_frame.grid_columnconfigure(0, weight=1, uniform="capture_col") # Uniform width for capture cols
+        self.left_capture_frame.grid_columnconfigure(1, weight=1, uniform="capture_col")
 
+        # Labels for columns (anchor 'n' for top alignment)
+        self.white_captured_label_col1 = tk.Label(self.left_capture_frame, text="", font=self.capture_font,
+                                                  justify=tk.LEFT, anchor='n', bg=self.capture_bg_color) # ANCHOR CHANGED
+        self.white_captured_label_col1.grid(row=0, column=0, sticky="nsew")
+
+        self.white_captured_label_col2 = tk.Label(self.left_capture_frame, text="", font=self.capture_font,
+                                                  justify=tk.LEFT, anchor='n', bg=self.capture_bg_color) # ANCHOR CHANGED
+        self.white_captured_label_col2.grid(row=0, column=1, sticky="nsew")
+
+        self.white_material_diff_label = tk.Label(self.left_capture_frame, text="", font=self.diff_font,
+                                                  anchor='w', bg=self.capture_bg_color)
+        self.white_material_diff_label.grid(row=1, column=0, columnspan=2, sticky="sw", pady=(5,0))
+
+        # Right Frame (Black Captures)
         self.right_capture_frame = tk.Frame(self.main_frame, bg=self.capture_bg_color, padx=3, pady=3)
-        self.right_capture_frame.grid(row=0, column=2, sticky="ns", padx=(3, 0))
-        self.black_captured_label = tk.Label(self.right_capture_frame, text="", font=self.capture_font,
-                                              justify=tk.LEFT, anchor='nw', wraplength=35,
-                                              bg=self.capture_bg_color)
-        self.black_captured_label.pack(fill=tk.BOTH, expand=True)
+        self.right_capture_frame.grid(row=0, column=2, sticky="nsew", padx=(3, 0))
+        self.right_capture_frame.grid_rowconfigure(0, weight=1) # Row for piece labels
+        self.right_capture_frame.grid_rowconfigure(1, weight=0) # Row for diff label
+        self.right_capture_frame.grid_columnconfigure(0, weight=1, uniform="capture_col") # Uniform width
+        self.right_capture_frame.grid_columnconfigure(1, weight=1, uniform="capture_col")
+
+        # Labels for columns (anchor 'n' for top alignment)
+        self.black_captured_label_col1 = tk.Label(self.right_capture_frame, text="", font=self.capture_font,
+                                                   justify=tk.LEFT, anchor='n', bg=self.capture_bg_color) # ANCHOR CHANGED
+        self.black_captured_label_col1.grid(row=0, column=0, sticky="nsew")
+
+        self.black_captured_label_col2 = tk.Label(self.right_capture_frame, text="", font=self.capture_font,
+                                                   justify=tk.LEFT, anchor='n', bg=self.capture_bg_color) # ANCHOR CHANGED
+        self.black_captured_label_col2.grid(row=0, column=1, sticky="nsew")
+
+        self.black_material_diff_label = tk.Label(self.right_capture_frame, text="", font=self.diff_font,
+                                                  anchor='w', bg=self.capture_bg_color)
+        self.black_material_diff_label.grid(row=1, column=0, columnspan=2, sticky="sw", pady=(5,0))
+
 
         # --- Board Frame ---
         self.board_frame = tk.Frame(self.main_frame)
@@ -182,12 +102,14 @@ class ChessGame:
             self.board_frame.grid_rowconfigure(i, weight=1, uniform="group1")
             self.board_frame.grid_columnconfigure(i, weight=1, uniform="group1")
 
-        self.create_board_widgets() # Create the button widgets
-        self.reset_game()          # Initialize game state and display
+        self.create_board_widgets()
+        self.reset_game()
 
         # --- Resize Handling ---
         self._resize_job = None
-        self.board_frame.bind("<Configure>", self.schedule_resize)
+        # Bind resize to the main_frame now to better gauge capture area width
+        self.main_frame.bind("<Configure>", self.schedule_resize)
+
 
         self.window.mainloop()
 
@@ -204,16 +126,14 @@ class ChessGame:
         }
         self.captured_pieces = {'white': [], 'black': []}
 
-        # Re-enable all squares if they exist
         if self.squares:
             for r in range(8):
                 for c in range(8):
                     if self.squares[r][c]:
-                        try:
-                            self.squares[r][c].config(state=tk.NORMAL)
-                        except tk.TclError: pass # Ignore if widget destroyed
+                        try: self.squares[r][c].config(state=tk.NORMAL)
+                        except tk.TclError: pass
 
-        self.update_display() # Update display with the new board state
+        self.update_display()
 
     def create_board_widgets(self):
         """Creates the Tkinter Button widgets for the board squares."""
@@ -230,6 +150,7 @@ class ChessGame:
                     self.squares[row][col] = square
 
     def initialize_board(self):
+        """Sets up the initial board configuration."""
         board = [[None for _ in range(8)] for _ in range(8)]
         piece_order = ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
         for col in range(8):
@@ -241,35 +162,50 @@ class ChessGame:
         return board
 
     def schedule_resize(self, event):
+        """Schedules a resize event to avoid rapid calls."""
         if self._resize_job:
             self.window.after_cancel(self._resize_job)
         self._resize_job = self.window.after(150, lambda e=event: self.on_resize(e))
 
     def on_resize(self, event):
+        """Handles window resize events to adjust font sizes."""
         self._resize_job = None
-        new_size = min(event.width, event.height) // 8
-        if new_size < 8: return
+        # Calculate board square size based on the board_frame widget if possible
+        board_width = self.board_frame.winfo_width()
+        board_height = self.board_frame.winfo_height()
+        new_size = min(board_width, board_height) // 8
+
+        # Fallback if board size isn't available yet (e.g., initial setup)
+        if new_size < 8:
+            new_size = min(event.width // 10, event.height // 8) # Approx based on main frame
+
+        if new_size < 8: return # Avoid making font too small
 
         new_font_size = max(6, int(new_size * 0.6))
         new_capture_font_size = max(5, int(new_font_size * 0.75))
+        new_diff_font_size = max(5, int(new_capture_font_size * 0.9))
 
         try:
             self.piece_font.configure(size=new_font_size)
             self.capture_font.configure(size=new_capture_font_size)
+            self.diff_font.configure(size=new_diff_font_size)
+
+            # Update all relevant labels (fonts are now handled by the Font objects)
+            # No need to reconfigure font objects here unless size changes
+
         except tk.TclError as e:
-            print(f"Error configuring font: {e}")
+            print(f"Error configuring font or widget during resize: {e}")
             return
-        self.update_display()
+        self.update_display() # Refresh display (text content might re-flow)
 
     def update_display(self):
         """Updates the board display, last move, selection, and captured pieces."""
         piece_symbols = {'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
                          'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'}
-        piece_colors = {'white': '#FFFFFF', 'black': '#000000'}
+        piece_colors_fg = {'white': '#000000', 'black': '#000000'}
+        MAX_PIECES_PER_COLUMN = 10
 
-        # Ensure widgets and board exist before updating
-        if not self.squares or not self.squares[0][0] or not self.board:
-             # print("Warning: Attempted update_display before full initialization.") # Optional debug
+        if not self.squares or not self.squares[0] or not self.squares[0][0] or not self.board:
              return
 
         # 1. Reset backgrounds
@@ -283,7 +219,6 @@ class ChessGame:
         # 2. Highlight last move
         if self.last_move:
             from_r, from_c, to_r, to_c, _ = self.last_move
-            # Check if squares exist before accessing them
             if 0 <= from_r < 8 and 0 <= from_c < 8 and self.squares[from_r][from_c]:
                 try: self.squares[from_r][from_c].config(bg=self.last_move_from_color)
                 except tk.TclError: pass
@@ -298,81 +233,96 @@ class ChessGame:
                 try: self.squares[sel_r][sel_c].config(bg=self.highlight_color)
                 except tk.TclError: pass
 
-        # 4. Set piece symbols
+        # 4. Set piece symbols on board
         for row in range(8):
             for col in range(8):
                 square_button = self.squares[row][col]
                 if not square_button: continue
-                piece = self.board[row][col] # Read from self.board
+                piece = self.board[row][col]
                 text_symbol = ''
                 text_color = 'black'
                 if piece:
                     color, piece_type = piece
                     symbol_key = piece_type.upper() if color == 'white' else piece_type.lower()
                     text_symbol = piece_symbols.get(symbol_key, '?')
-                    text_color = piece_colors.get(color, 'black')
+                    text_color = piece_colors_fg.get(color, 'black')
                 try:
                     square_button.config(font=self.piece_font, text=text_symbol, fg=text_color)
                 except tk.TclError: pass
 
-        # 5. Update Captured Pieces
-        white_captures_text = ""
+        # 5. Update Captured Pieces (Building vertical strings for columns)
+        white_col1_text = ""
+        white_col2_text = ""
         value_diff_white = 0
-        black_captures_text = ""
+        black_col1_text = ""
+        black_col2_text = ""
         value_diff_black = 0
 
-        # Ensure captured_pieces is initialized
         if self.captured_pieces:
-            # White captures (black pieces)
-            for cap_color, cap_type in self.captured_pieces.get('white', []):
+            # --- White captures (black pieces captured by white) ---
+            white_captures_list = self.captured_pieces.get('white', [])
+            for i, (cap_color, cap_type) in enumerate(white_captures_list):
                 symbol_key = cap_type.lower()
-                white_captures_text += piece_symbols.get(symbol_key, '?') + " "
+                # Append symbol AND a newline character
+                symbol = piece_symbols.get(symbol_key, '?') + "\n"
+                if i < MAX_PIECES_PER_COLUMN:
+                    white_col1_text += symbol
+                else:
+                    white_col2_text += symbol
                 value_diff_white += self.piece_values.get(cap_type, 0)
 
-            # Black captures (white pieces)
-            for cap_color, cap_type in self.captured_pieces.get('black', []):
+            # --- Black captures (white pieces captured by black) ---
+            black_captures_list = self.captured_pieces.get('black', [])
+            for i, (cap_color, cap_type) in enumerate(black_captures_list):
                 symbol_key = cap_type.upper()
-                black_captures_text += piece_symbols.get(symbol_key, '?') + " "
+                # Append symbol AND a newline character
+                symbol = piece_symbols.get(symbol_key, '?') + "\n"
+                if i < MAX_PIECES_PER_COLUMN:
+                    black_col1_text += symbol
+                else:
+                    black_col2_text += symbol
                 value_diff_black += self.piece_values.get(cap_type, 0)
 
-            # Calculate and add material difference
+            # --- Calculate material difference ---
             diff = value_diff_white - value_diff_black
-            if diff > 0: white_captures_text += f"\n+{diff}"
-            elif diff < 0: black_captures_text += f"\n+{-diff}"
+            white_diff_str = ""
+            black_diff_str = ""
+            if diff > 0: white_diff_str = f"+{diff}"
+            elif diff < 0: black_diff_str = f"+{-diff}"
 
-            # Update labels (with try-except for safety)
-            if self.white_captured_label:
-                 try:
-                     self.white_captured_label.config(text=white_captures_text.strip())
-                 except tk.TclError:
-                     pass
-            if self.black_captured_label:
-                 try:
-                     self.black_captured_label.config(text=black_captures_text.strip())
-                 except tk.TclError:
-                     pass
-        else:
-             # Clear capture labels if captured_pieces is None (e.g., during initial setup)
-             # --- CORRECTED SYNTAX ---
-             if self.white_captured_label:
-                 try:
-                     self.white_captured_label.config(text="")
-                 except tk.TclError:
-                     pass # Ignore if widget destroyed during reset/close
-             if self.black_captured_label:
-                 try:
-                     self.black_captured_label.config(text="")
-                 except tk.TclError:
-                     pass # Ignore if widget destroyed during reset/close
-             # --- END CORRECTION ---
+            # --- Update labels (use strip() to remove trailing newline) ---
+            try:
+                if self.white_captured_label_col1: self.white_captured_label_col1.config(text=white_col1_text.strip())
+                if self.white_captured_label_col2: self.white_captured_label_col2.config(text=white_col2_text.strip())
+                if self.white_material_diff_label: self.white_material_diff_label.config(text=white_diff_str)
+
+                if self.black_captured_label_col1: self.black_captured_label_col1.config(text=black_col1_text.strip())
+                if self.black_captured_label_col2: self.black_captured_label_col2.config(text=black_col2_text.strip())
+                if self.black_material_diff_label: self.black_material_diff_label.config(text=black_diff_str)
+            except tk.TclError: pass
+
+        else: # Clear all labels if no captures structure exists
+             labels_to_clear = [
+                 self.white_captured_label_col1, self.white_captured_label_col2, self.white_material_diff_label,
+                 self.black_captured_label_col1, self.black_captured_label_col2, self.black_material_diff_label
+             ]
+             for label in labels_to_clear:
+                 if label:
+                     try: label.config(text="")
+                     except tk.TclError: pass
 
 
+    # --- Rest of the methods (square_clicked, make_move, undo_move, evaluate_move, make_bot_move, etc.) remain the same ---
+    # --- They are omitted here for brevity but should be included in the final file ---
     def square_clicked(self, row, col):
+        """Handles clicks on board squares for selecting and moving pieces."""
         if not self.is_player_turn: return
+
         try:
             if self.squares[row][col].cget('state') == tk.DISABLED:
                 return
         except (tk.TclError, IndexError, AttributeError):
+             print(f"Warning: Clicked on invalid/destroyed square ({row},{col})")
              return
 
         current_piece = self.board[row][col]
@@ -388,9 +338,9 @@ class ChessGame:
                 self.make_move(old_row, old_col, row, col)
                 self.selected_piece = None
                 self.update_display()
-                if not self.check_game_over(): # Check game over *after* player move
+                if not self.check_game_over():
                     self.is_player_turn = False
-                    self.window.after(250, self.make_bot_move) # Schedule bot move
+                    self.window.after(250, self.make_bot_move)
             elif current_piece and current_piece[0] == 'white':
                 self.selected_piece = (row, col)
                 self.update_display()
@@ -403,6 +353,10 @@ class ChessGame:
             self.update_display()
 
     def make_move(self, from_row, from_col, to_row, to_col, is_simulation=False):
+        """
+        Makes a move on the board. Handles captures, castling, en passant, promotion.
+        Returns undo information if is_simulation is True.
+        """
         piece = self.board[from_row][from_col]
         if not piece: return None
         color, piece_type = piece
@@ -415,24 +369,27 @@ class ChessGame:
         en_passant_capture_details = None
         castling_rook_move_details = None
 
+        # --- Update Castling Rights ---
         if piece_type == 'K':
-            self.castling_rights[color]['kingside'] = False; self.castling_rights[color]['queenside'] = False
+            self.castling_rights[color]['kingside'] = False
+            self.castling_rights[color]['queenside'] = False
         elif piece_type == 'R':
             start_row = 7 if color == 'white' else 0
             if from_row == start_row:
                 if from_col == 0: self.castling_rights[color]['queenside'] = False
                 elif from_col == 7: self.castling_rights[color]['kingside'] = False
         if captured_piece:
-             cap_color, cap_type = captured_piece; cap_start_row = 7 if cap_color == 'white' else 0
+             cap_color, cap_type = captured_piece
+             cap_start_row = 7 if cap_color == 'white' else 0
              if cap_type == 'R' and to_row == cap_start_row:
                  if to_col == 0: self.castling_rights[cap_color]['queenside'] = False
                  elif to_col == 7: self.castling_rights[cap_color]['kingside'] = False
 
+        # --- Special Move Handling ---
         en_passant_capture_made = False
         if piece_type == 'P' and abs(from_col - to_col) == 1 and captured_piece is None:
             potential_ep_pawn_row = from_row
             potential_ep_pawn_col = to_col
-
             if 0 <= potential_ep_pawn_row < 8 and 0 <= potential_ep_pawn_col < 8:
                  ep_captured_pawn = self.board[potential_ep_pawn_row][potential_ep_pawn_col]
                  if self.last_move and ep_captured_pawn and ep_captured_pawn[0] != color and ep_captured_pawn[1] == 'P':
@@ -448,92 +405,106 @@ class ChessGame:
 
         is_castling_move = False
         if piece_type == 'K' and abs(to_col - from_col) == 2:
-            is_castling_move = True; rook_from_col = 7 if to_col > from_col else 0; rook_to_col = 5 if to_col > from_col else 3
+            is_castling_move = True
+            rook_from_col = 7 if to_col > from_col else 0
+            rook_to_col = 5 if to_col > from_col else 3
             if 0 <= from_row < 8 and 0 <= rook_from_col < 8 and 0 <= rook_to_col < 8:
                  rook_piece = self.board[from_row][rook_from_col]
                  if is_simulation: castling_rook_move_details = (rook_piece, (from_row, rook_from_col), (from_row, rook_to_col))
-                 self.board[from_row][rook_to_col] = rook_piece; self.board[from_row][rook_from_col] = None
+                 self.board[from_row][rook_to_col] = rook_piece
+                 self.board[from_row][rook_from_col] = None
 
+        # --- Execute the Primary Move ---
         self.board[to_row][to_col] = piece
         self.board[from_row][from_col] = None
 
+        # --- Pawn Promotion ---
         promoted_to = None
         promote_row = 0 if color == 'white' else 7
         if piece_type == 'P' and to_row == promote_row:
-            promoted_to = 'Q'; self.board[to_row][to_col] = (color, promoted_to)
+            promoted_to = 'Q'
+            self.board[to_row][to_col] = (color, promoted_to)
+            piece = self.board[to_row][to_col] # Update piece tuple
 
+        # --- Post-Move Updates ---
         if captured_piece and not is_simulation:
-            # Ensure captured_pieces exists before appending
-            if self.captured_pieces is not None:
-                 self.captured_pieces[moving_color].append(captured_piece)
+            if self.captured_pieces is not None and isinstance(self.captured_pieces, dict):
+                 capturing_color = color
+                 self.captured_pieces[capturing_color].append(captured_piece)
 
         if not is_simulation:
             self.last_move = (from_row, from_col, to_row, to_col, piece)
 
+        # --- Return Undo Info (Simulation Only) ---
         if is_simulation:
-            undo_info = { "from_pos": (from_row, from_col), "to_pos": (to_row, to_col),
-                          "moved_piece": piece, "captured_piece": captured_piece if not en_passant_capture_made else None,
-                          "en_passant_details": en_passant_capture_details,
-                          "castling_details": castling_rook_move_details, "promoted_to": promoted_to,
-                          "original_castling_rights": original_castling_rights,
-                          "original_last_move": original_last_move }
+            undo_info = {
+                "from_pos": (from_row, from_col), "to_pos": (to_row, to_col),
+                "moved_piece": (color, piece_type),
+                "captured_piece": captured_piece if not en_passant_capture_made else None,
+                "en_passant_details": en_passant_capture_details,
+                "castling_details": castling_rook_move_details,
+                "promoted_to": promoted_to,
+                "original_castling_rights": original_castling_rights,
+                "original_last_move": original_last_move
+            }
             return undo_info
         else:
             return None
 
     def undo_move(self, undo_info):
+        """Reverts the board state using the information from a simulated move."""
         if not undo_info: return
-        from_r, from_c = undo_info["from_pos"]; to_r, to_c = undo_info["to_pos"]
+        from_r, from_c = undo_info["from_pos"]
+        to_r, to_c = undo_info["to_pos"]
         self.board[from_r][from_c] = undo_info["moved_piece"]
         self.board[to_r][to_c] = undo_info["captured_piece"]
-        if undo_info["promoted_to"]:
-             color = undo_info["moved_piece"][0]; self.board[from_r][from_c] = (color, 'P')
         if undo_info["en_passant_details"]:
             ep_pawn_captured, (r_ep, c_ep) = undo_info["en_passant_details"]
             self.board[r_ep][c_ep] = ep_pawn_captured
             self.board[to_r][to_c] = None
         if undo_info["castling_details"]:
             rook_piece, (r_from, c_from), (r_to, c_to) = undo_info["castling_details"]
-            self.board[r_from][c_from] = rook_piece; self.board[r_to][c_to] = None
+            self.board[r_from][c_from] = rook_piece
+            self.board[r_to][c_to] = None
         self.castling_rights = undo_info["original_castling_rights"]
         self.last_move = undo_info["original_last_move"]
 
     def evaluate_move(self, from_row, from_col, to_row, to_col):
-        score = 0; bot_color = 'black'; opponent_color = 'white'
+        """Evaluates the score of a potential bot move."""
+        score = 0
+        bot_color = 'black'
+        opponent_color = 'white'
         moving_piece = self.board[from_row][from_col]
         target_piece = self.board[to_row][to_col]
-
         piece_to_be_captured = target_piece
-        if not piece_to_be_captured and moving_piece and moving_piece[1] == 'P' and abs(from_col - to_col) == 1: # Check moving_piece exists
+        if not piece_to_be_captured and moving_piece and moving_piece[1] == 'P' and abs(from_col - to_col) == 1:
              ep_row, ep_col = from_row, to_col
              if 0 <= ep_row < 8 and 0 <= ep_col < 8:
                 possible_ep_pawn = self.board[ep_row][ep_col]
                 if possible_ep_pawn and possible_ep_pawn[0] == opponent_color and possible_ep_pawn[1] == 'P':
                      if self.last_move:
                          lm_from_r, lm_from_c, lm_to_r, lm_to_c, lm_piece = self.last_move
-                         if lm_piece == possible_ep_pawn and abs(lm_from_r - lm_to_r) == 2 and lm_to_r == ep_row and lm_to_c == ep_col:
+                         if (lm_piece == possible_ep_pawn and abs(lm_from_r - lm_to_r) == 2 and
+                             lm_to_r == ep_row and lm_to_c == ep_col):
                              piece_to_be_captured = possible_ep_pawn
-
         if piece_to_be_captured and piece_to_be_captured[0] == opponent_color:
              score += self.piece_values.get(piece_to_be_captured[1], 0)
-
         undo_info = self.make_move(from_row, from_col, to_row, to_col, is_simulation=True)
         if undo_info is None: return -99999
-
         if self.is_checkmate(opponent_color): score += self.CHECKMATE_SCORE
         elif self.is_in_check(opponent_color): score += self.CHECK_SCORE
-        # Need moving_piece again as it might have been altered by simulation (promotion)
-        sim_moving_piece = self.board[to_row][to_col] # Get piece after simulation
-        if sim_moving_piece and sim_moving_piece[1] == 'K' and abs(to_col - from_col) == 2:
+        sim_moving_piece_after = self.board[to_row][to_col]
+        if sim_moving_piece_after and sim_moving_piece_after[1] == 'K' and abs(to_col - from_col) == 2:
              score += self.CASTLE_SCORE
-
+        if undo_info.get("promoted_to"):
+             score += self.piece_values.get(undo_info["promoted_to"], 900) - self.piece_values['P']
         self.undo_move(undo_info)
         score += random.randint(0, 5)
         return score
 
     def make_bot_move(self):
+        """Selects and makes the best move for the bot (black)."""
         if self.is_player_turn: return
-
         possible_moves = []
         bot_color = 'black'
         for r1 in range(8):
@@ -545,75 +516,66 @@ class ChessGame:
                             if self.is_valid_move(r1, c1, r2, c2):
                                 possible_moves.append(((r1, c1), (r2, c2)))
         if not possible_moves:
+            print("Bot has no legal moves.")
             self.check_game_over()
+            if not self.is_checkmate(bot_color) and not self.is_stalemate(bot_color):
+                 print("Warning: Bot has no moves but game not over?")
+                 self.is_player_turn = True
             return
-
         scored_moves = []
         for move in possible_moves:
             (r1, c1), (r2, c2) = move
             score = self.evaluate_move(r1, c1, r2, c2)
             scored_moves.append((score, move))
-
         if not scored_moves:
+             print("Error: No scored moves generated?")
              chosen_move = random.choice(possible_moves) if possible_moves else None
-             best_score = "N/A (Fallback)"
+             best_score = "N/A (Error)"
         else:
             scored_moves.sort(key=lambda item: item[0], reverse=True)
             best_score = scored_moves[0][0]
-            # Filter potentially multiple best moves
-            best_score_threshold = best_score - 1 # Allow for small random variations
+            best_score_threshold = best_score - 5
             best_moves = [item[1] for item in scored_moves if item[0] >= best_score_threshold]
-            # Ensure best_moves is not empty
-            if not best_moves:
-                best_moves = [scored_moves[0][1]] # Fallback to the absolute highest score if filter is too strict
+            if not best_moves: best_moves = [scored_moves[0][1]]
             chosen_move = random.choice(best_moves)
-
-
         if chosen_move:
             (from_row, from_col), (to_row, to_col) = chosen_move
-            moving_piece = self.board[from_row][from_col] # Get piece before move
-            if not moving_piece: # Should not happen if logic is correct
-                print("Error: Bot chose move for empty square?")
-                self.is_player_turn = True # Prevent infinite loop
-                return
-
+            moving_piece = self.board[from_row][from_col]
+            if not moving_piece:
+                print(f"Error: Bot chose move for empty square? {chosen_move}")
+                self.is_player_turn = True; return
             moving_piece_type = moving_piece[1]
             target_desc = f"({to_row},{to_col})"
             target_piece = self.board[to_row][to_col]
             is_ep = False
             if not target_piece and moving_piece_type == 'P' and abs(from_col - to_col) == 1:
-                # Check if it's a valid EP square based on last move
-                if self.last_move:
+                 if self.last_move:
                     lm_from_r, lm_from_c, lm_to_r, lm_to_c, lm_piece = self.last_move
-                    if (lm_piece[1] == 'P' and abs(lm_from_r - lm_to_r) == 2 and
-                        lm_to_r == from_row and lm_to_c == to_col and
-                        to_row == from_row + (1 if bot_color == 'black' else -1)):
-                        is_ep = True
-
+                    pawn_adv_two_row = 4
+                    if (lm_piece[0] == 'white' and lm_piece[1] == 'P' and abs(lm_from_r - lm_to_r) == 2 and
+                        lm_to_r == from_row and lm_to_c == to_col and to_row == 5): is_ep = True
             if target_piece: target_desc = f"x{target_piece[1]} at ({to_row},{to_col})"
             elif is_ep: target_desc += " (EP)"
+            elif moving_piece_type == 'K' and abs(to_col - from_col) == 2:
+                 target_desc = "O-O" if to_col == 6 else "O-O-O"
             print(f"Bot moves: {moving_piece_type} ({from_row},{from_col})->{target_desc} (Score: {best_score})")
-
             self.make_move(from_row, from_col, to_row, to_col)
             self.update_display()
             self.is_player_turn = True
-            # Check game over *after* bot move completes and turn switches
             self.check_game_over()
         else:
+            print("Bot could not choose a move.")
             self.check_game_over()
 
-
-    # --- Validation/Utility/Game State functions ---
     def is_valid_move(self, from_row, from_col, to_row, to_col):
+        """Checks if a move is fully legal (basic rules + doesn't leave king in check)."""
         piece_data = self.board[from_row][from_col];
         if not piece_data: return False
         color, piece_type = piece_data;
         if not (0 <= to_row < 8 and 0 <= to_col < 8): return False
         target = self.board[to_row][to_col];
         if target and target[0] == color:
-             # Allow targeting rook square during castling validation
-             if not (piece_type == 'K' and abs(to_col - from_col) == 2 and target[1] == 'R'):
-                  return False
+             if not (piece_type == 'K' and target[1] == 'R' and abs(to_col - from_col) >= 2): return False
         valid_basic_move = False;
         if piece_type == 'P': valid_basic_move = self.is_valid_pawn_move(from_row, from_col, to_row, to_col, color)
         elif piece_type == 'R': valid_basic_move = self.is_valid_rook_move(from_row, from_col, to_row, to_col)
@@ -627,17 +589,20 @@ class ChessGame:
         if undo_info:
             king_in_check_after_move = self.is_in_check(color)
             self.undo_move(undo_info)
-        else: return False
+        else:
+            print(f"Error: Simulation failed during validation for {piece_type} {color} from ({from_row},{from_col}) to ({to_row},{to_col})")
+            return False
         return not king_in_check_after_move
 
     def is_basic_move_valid(self, from_row, from_col, to_row, to_col, piece_type, color):
+        """Checks only basic geometric movement rules, ignoring path/checks etc."""
         target = self.board[to_row][to_col]
         if piece_type == 'P':
              direction = 1 if color == 'black' else -1
+             if to_row == from_row + direction and abs(to_col - from_col) == 1: return True
              if from_col == to_col and to_row == from_row + direction: return True
              start_row = 1 if color == 'black' else 6
              if from_row == start_row and from_col == to_col and to_row == from_row + 2 * direction: return True
-             if to_row == from_row + direction and abs(to_col - from_col) == 1: return True
              return False
         elif piece_type == 'R': return from_row == to_row or from_col == to_col
         elif piece_type == 'N':
@@ -653,30 +618,25 @@ class ChessGame:
         return False
 
     def is_valid_pawn_move(self, from_row, from_col, to_row, to_col, color):
+        """Checks detailed pawn move validity."""
         direction = 1 if color == 'black' else -1; start_row = 1 if color == 'black' else 6
         if not (0 <= to_row < 8 and 0 <= to_col < 8): return False
-
-        if from_col == to_col and to_row == from_row + direction:
-            return self.board[to_row][to_col] is None
-
+        if from_col == to_col and to_row == from_row + direction: return self.board[to_row][to_col] is None
         if from_row == start_row and from_col == to_col and to_row == from_row + 2 * direction:
             path_clear = self.board[from_row + direction][from_col] is None
             destination_clear = self.board[to_row][to_col] is None
             return path_clear and destination_clear
-
         if to_row == from_row + direction and abs(to_col - from_col) == 1:
             target = self.board[to_row][to_col]
-            # Standard capture
             if target is not None and target[0] != color: return True
-            # En Passant check
             if target is None and self.last_move:
                  lm_from_r, lm_from_c, lm_to_r, lm_to_c, lm_piece = self.last_move
                  if (lm_piece[0] != color and lm_piece[1] == 'P' and abs(lm_from_r - lm_to_r) == 2 and
-                     lm_to_r == from_row and lm_to_c == to_col): # Check adjacent pawn was the one that just moved two steps
-                     return True
+                     lm_to_r == from_row and lm_to_c == to_col): return True
         return False
 
     def _is_path_clear(self, from_row, from_col, to_row, to_col):
+        """Checks if the path is clear between two squares (for R, B, Q)."""
         row_step = 0 if from_row == to_row else (1 if to_row > from_row else -1); col_step = 0 if from_col == to_col else (1 if to_col > from_col else -1)
         current_row, current_col = from_row + row_step, from_col + col_step
         while (current_row, current_col) != (to_row, to_col):
@@ -703,63 +663,57 @@ class ChessGame:
         return self._is_path_clear(from_row, from_col, to_row, to_col)
 
     def is_valid_king_move(self, from_row, from_col, to_row, to_col, color):
+        """Checks King move validity (one step, castling)."""
         if abs(to_row - from_row) <= 1 and abs(to_col - from_col) <= 1:
-             target = self.board[to_row][to_col]
-             return target is None or target[0] != color
-
-        if from_row == to_row and abs(to_col - from_col) == 2: # Castling attempt
+             target = self.board[to_row][to_col]; return target is None or target[0] != color
+        if from_row == to_row and abs(to_col - from_col) == 2:
             if self.is_in_check(color): return False
             king_start_row = 7 if color == 'white' else 0
             if from_row != king_start_row: return False
-
             opponent_color = 'black' if color == 'white' else 'white'
             if to_col == 6: # Kingside
-                rook_col = 7
+                rook_col=7;
                 if not self.castling_rights[color]['kingside']: return False
                 if self.board[from_row][5] is not None or self.board[from_row][6] is not None: return False
                 if self.is_square_attacked(from_row,5,opponent_color) or self.is_square_attacked(from_row,6,opponent_color): return False
-                # Ensure rook is present and correct type/color
-                rook = self.board[from_row][rook_col]
+                rook = self.board[from_row][rook_col];
                 if not rook or rook != (color, 'R'): return False
                 return True
             elif to_col == 2: # Queenside
-                rook_col = 0
+                rook_col=0;
                 if not self.castling_rights[color]['queenside']: return False
                 if self.board[from_row][1] is not None or self.board[from_row][2] is not None or self.board[from_row][3] is not None: return False
                 if self.is_square_attacked(from_row,2,opponent_color) or self.is_square_attacked(from_row,3,opponent_color): return False
-                rook = self.board[from_row][rook_col]
+                rook = self.board[from_row][rook_col];
                 if not rook or rook != (color, 'R'): return False
                 return True
         return False
 
     def find_king(self, color):
+        """Finds the position (row, col) of the specified color's king."""
         if not self.board: return None
         for r in range(8):
             for c in range(8):
                 piece = self.board[r][c];
                 if piece and piece == (color, 'K'): return (r, c)
-        print(f"Warning: King not found for {color}") # Should not happen
+        print(f"Critical Error: King not found for {color}!")
         return None
 
     def is_square_attacked(self, row, col, attacker_color):
+        """Checks if a given square is attacked by the opponent."""
         if not self.board: return False
         for r in range(8):
             for c in range(8):
                 piece_data = self.board[r][c]
                 if piece_data and piece_data[0] == attacker_color:
-                    # Simplified check: Can the piece make the basic move *ignoring checks/path for non-pawns/knights*?
-                    # Pawns attack diagonally
-                    if piece_data[1] == 'P':
-                        direction = 1 if attacker_color == 'black' else -1
-                        if row == r + direction and abs(col - c) == 1:
-                            return True
-                    # Use basic geometry check, then path check only if needed
-                    elif self.is_basic_move_valid(r, c, row, col, piece_data[1], attacker_color):
-                         if piece_data[1] != 'N' and piece_data[1] != 'P': # Knights jump, pawn handled above
-                              if self._is_path_clear(r, c, row, col):
-                                   return True
-                         elif piece_data[1] == 'N': # Knight check
-                              return True
+                    attacker_piece_type = piece_data[1]
+                    if self.is_basic_move_valid(r, c, row, col, attacker_piece_type, attacker_color):
+                        if attacker_piece_type == 'P':
+                            direction = 1 if attacker_color == 'black' else -1
+                            if row == r + direction and abs(col - c) == 1: return True
+                        elif attacker_piece_type == 'N': return True
+                        else:
+                             if self._is_path_clear(r, c, row, col): return True
         return False
 
     def is_in_check(self, color):
@@ -776,8 +730,7 @@ class ChessGame:
                 if piece and piece[0] == color:
                     for r2 in range(8):
                         for c2 in range(8):
-                            if self.is_valid_move(r1, c1, r2, c2):
-                                 return True
+                            if self.is_valid_move(r1, c1, r2, c2): return True
         return False
 
     def is_checkmate(self, color):
@@ -791,55 +744,35 @@ class ChessGame:
     def check_game_over(self):
         """ Checks for checkmate or stalemate and asks to play again."""
         player_whose_move_it_is = 'white' if self.is_player_turn else 'black'
-
         mate = self.is_checkmate(player_whose_move_it_is)
         stale = self.is_stalemate(player_whose_move_it_is)
-
-        if mate or stale:
-            if mate:
-                winner = 'Black' if player_whose_move_it_is == 'white' else 'White'
-                message = f"Checkmate! {winner} wins!"
-            else: # stale
-                message = "Stalemate! It's a draw."
-
-            # Disable board immediately
+        game_is_over = mate or stale
+        if game_is_over:
+            winner = 'Black' if player_whose_move_it_is == 'white' else 'White'
+            message = f"Checkmate! {winner} wins!" if mate else "Stalemate! It's a draw."
+            print(message)
             for r in range(8):
                 for c in range(8):
                     if self.squares[r][c]:
                         try: self.squares[r][c].config(state=tk.DISABLED)
                         except tk.TclError: pass
-
-            # Schedule the ask_play_again dialog
-            self.window.after(50, lambda m=message: self.ask_play_again(m))
-
-            return True # Indicate game is over
-
-        return False # Game is not over
+            self.window.after(100, lambda m=message: self.ask_play_again(m))
+            return True
+        return False
 
     def ask_play_again(self, message):
         """Shows the game over message and asks the user if they want to play again."""
-        # Ensure the main window is still responsive before showing the dialog
-        try:
-            self.window.update_idletasks() # Process pending events
-        except tk.TclError:
-            return # Window likely closed
-
-        play_again = messagebox.askyesno(
-            title="Game Over",
-            message=f"{message}\n\nDo you want to play again?"
-        )
-
-        if play_again:
-            self.reset_game()
+        try: self.window.update_idletasks()
+        except tk.TclError: print("Window closed before play again dialog."); return
+        play_again = messagebox.askyesno(title="Game Over", message=f"{message}\n\nDo you want to play again?")
+        if play_again: print("User chose to play again."); self.reset_game()
         else:
-            print("Exiting.")
-            # Use destroy() for cleaner exit than quit() in some cases
-            try:
-                 self.window.destroy()
-            except tk.TclError:
-                 pass # Ignore if already destroyed
+            print("User chose not to play again. Exiting.")
+            try: self.window.destroy()
+            except tk.TclError: pass
+
 
 # ==================================================================
-
 if __name__ == "__main__":
+    print("Starting Chess Game...")
     game = ChessGame()
